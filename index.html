@@ -323,6 +323,46 @@
             margin: 2rem 0;
             text-align: right;
         }
+
+        /* 打印样式 */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            .print-area, .print-area * {
+                visibility: visible;
+            }
+            .print-area {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 210mm;
+                min-height: 297mm;
+                padding: 15mm;
+                font-size: 12pt;
+                background: white;
+                color: black;
+            }
+            .print-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 20px;
+            }
+            .print-table th,
+            .print-table td {
+                padding: 10px;
+                border: 1px solid #000;
+            }
+            .print-title {
+                text-align: center;
+                font-size: 24pt;
+                margin-bottom: 20px;
+            }
+            .print-info {
+                margin-bottom: 30px;
+                font-size: 14pt;
+            }
+        }
     </style>
 </head>
 <body>
@@ -387,6 +427,28 @@
             <div id="salaryUserList" class="user-list"></div>
             <button onclick="closeSalaryModal()" class="gold-btn">❌ 取消</button>
         </div>
+    </div>
+
+    <!-- 打印区域 -->
+    <div class="print-area" style="display: none;">
+        <h2 class="print-title">工资明细表</h2>
+        <div class="print-info">
+            <div>姓名：<span id="printUserName"></span></div>
+            <div>月份：<span id="printMonth"></span></div>
+            <div>总金额：¥<span id="printTotal"></span></div>
+        </div>
+        <table class="print-table">
+            <thead>
+                <tr>
+                    <th>日期</th>
+                    <th>开始时间</th>
+                    <th>结束时间</th>
+                    <th>时长</th>
+                    <th>金额</th>
+                </tr>
+            </thead>
+            <tbody id="printBody"></tbody>
+        </table>
     </div>
 
     <script>
@@ -462,18 +524,9 @@
             currentUser = name;
             const now = new Date();
             let initialDate = new Date();
-
-            // 设置默认日期（6点前为前一天）
-            if (now.getHours() < 6) {
-                initialDate.setDate(initialDate.getDate() - 1);
-            }
-
-            // 格式化为YYYY-MM-DD
-            const year = initialDate.getFullYear();
-            const month = String(initialDate.getMonth() + 1).padStart(2, '0');
-            const day = String(initialDate.getDate()).padStart(2, '0');
-            document.getElementById('workDate').value = `${year}-${month}-${day}`;
-
+            if (now.getHours() < 6) initialDate.setDate(initialDate.getDate() - 1);
+            const formattedDate = initialDate.toISOString().split('T')[0];
+            document.getElementById('workDate').value = formattedDate;
             document.getElementById('startTime').value = '';
             document.getElementById('endTime').value = '';
             document.getElementById('timeModal').style.display = 'flex';
@@ -489,13 +542,9 @@
                 return;
             }
 
-            // 计算时长（处理跨天）
             const startDateTime = new Date(`${workDate}T${start}`);
             let endDateTime = new Date(`${workDate}T${end}`);
-
-            if (end < start) {
-                endDateTime.setDate(endDateTime.getDate() + 1);
-            }
+            if (end < start) endDateTime.setDate(endDateTime.getDate() + 1);
 
             const diffMs = endDateTime - startDateTime;
             if (diffMs < 0) {
@@ -504,17 +553,11 @@
             }
 
             const hours = (diffMs / 3600000).toFixed(2);
+            const amount = hours * 50;
 
-            records.push({
-                date: workDate,
-                user: currentUser,
-                start,
-                end,
-                hours,
-                amount: hours * 50
-            });
-
+            records.push({ date: workDate, user: currentUser, start, end, hours, amount });
             localStorage.setItem('records', JSON.stringify(records));
+
             closeModal();
             renderHistory();
             showToast('记录保存成功 ✔');
@@ -553,19 +596,39 @@
             );
 
             const total = userRecords.reduce((sum, r) => sum + r.amount, 0);
-            const detail = userRecords.map(r => `
-                <div class="salary-detail">
-                    📅 ${r.date} ⏰ ${r.start}-${r.end}
-                    (🕒 ${r.hours}小时) 💰 ¥${r.amount.toFixed(2)}
-                </div>
-            `).join('');
+            updatePrintData(user, currentMonth + 1, userRecords, total);
 
             document.getElementById('salaryResult').innerHTML = `
                 <h3>${user} 本月工资明细</h3>
                 <div>💰 总金额：¥${total.toFixed(2)}</div>
-                ${detail}
+                <button onclick="generatePrint()" class="gold-btn">🖨️ 生成明细表格</button>
             `;
             closeSalaryModal();
+        }
+
+        // 打印功能
+        function updatePrintData(user, month, records, total) {
+            document.getElementById('printUserName').textContent = user;
+            document.getElementById('printMonth').textContent = `${month}月`;
+            document.getElementById('printTotal').textContent = total.toFixed(2);
+
+            const tbody = document.getElementById('printBody');
+            tbody.innerHTML = records.map(r => `
+                <tr>
+                    <td>${r.date}</td>
+                    <td>${r.start}</td>
+                    <td>${r.end}</td>
+                    <td>${r.hours}小时</td>
+                    <td>¥${r.amount.toFixed(2)}</td>
+                </tr>
+            `).join('');
+        }
+
+        function generatePrint() {
+            const printArea = document.querySelector('.print-area');
+            printArea.style.display = 'block';
+            window.print();
+            printArea.style.display = 'none';
         }
 
         // 系统初始化
