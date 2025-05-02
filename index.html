@@ -244,10 +244,11 @@
         .time-input {
             display: flex;
             gap: 1rem;
-            margin: 2rem 0;
+            margin: 1rem 0;
             align-items: center;
         }
 
+        input[type="date"],
         input[type="time"] {
             background: var(--bg-3);
             border: 1px solid var(--gold-1);
@@ -257,6 +258,11 @@
             width: 100%;
             font-size: 1.2em;
             transition: all 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            box-shadow: 0 0 15px var(--gold-1);
         }
 
         .gold-btn {
@@ -360,6 +366,9 @@
         <div class="modal-content">
             <h3>⏰ 选择工作时间</h3>
             <div class="time-input">
+                <input type="date" id="workDate" required>
+            </div>
+            <div class="time-input">
                 <input type="time" id="startTime" required>
                 <span style="color: var(--gold-1);">➔</span>
                 <input type="time" id="endTime" required>
@@ -451,25 +460,53 @@
         // 打卡功能
         function selectUser(name) {
             currentUser = name;
+            const now = new Date();
+            let initialDate = new Date();
+
+            // 设置默认日期（6点前为前一天）
+            if (now.getHours() < 6) {
+                initialDate.setDate(initialDate.getDate() - 1);
+            }
+
+            // 格式化为YYYY-MM-DD
+            const year = initialDate.getFullYear();
+            const month = String(initialDate.getMonth() + 1).padStart(2, '0');
+            const day = String(initialDate.getDate()).padStart(2, '0');
+            document.getElementById('workDate').value = `${year}-${month}-${day}`;
+
+            document.getElementById('startTime').value = '';
+            document.getElementById('endTime').value = '';
             document.getElementById('timeModal').style.display = 'flex';
         }
 
         function saveRecord() {
+            const workDate = document.getElementById('workDate').value;
             const start = document.getElementById('startTime').value;
             const end = document.getElementById('endTime').value;
 
-            if (!start || !end) {
-                showToast('请选择完整时间段 ❗');
+            if (!workDate || !start || !end) {
+                showToast('请填写完整信息 ❗');
                 return;
             }
 
-            const startDate = new Date(`2000-01-01T${start}`);
-            const endDate = new Date(start < end ? `2000-01-01T${end}` : `2000-01-02T${end}`);
-            const diffMs = endDate - startDate;
+            // 计算时长（处理跨天）
+            const startDateTime = new Date(`${workDate}T${start}`);
+            let endDateTime = new Date(`${workDate}T${end}`);
+
+            if (end < start) {
+                endDateTime.setDate(endDateTime.getDate() + 1);
+            }
+
+            const diffMs = endDateTime - startDateTime;
+            if (diffMs < 0) {
+                showToast('时间输入有误 ❗');
+                return;
+            }
+
             const hours = (diffMs / 3600000).toFixed(2);
 
             records.push({
-                date: calculateRecordDate(end),
+                date: workDate,
                 user: currentUser,
                 start,
                 end,
@@ -481,13 +518,6 @@
             closeModal();
             renderHistory();
             showToast('记录保存成功 ✔');
-        }
-
-        function calculateRecordDate(endTime) {
-            const now = new Date();
-            const [hours] = endTime.split(':').map(Number);
-            if (hours < 6) now.setDate(now.getDate() - 1);
-            return now.toISOString().split('T')[0];
         }
 
         // 历史记录
@@ -554,8 +584,6 @@
         // 工具函数
         function closeModal() {
             document.getElementById('timeModal').style.display = 'none';
-            document.getElementById('startTime').value = '';
-            document.getElementById('endTime').value = '';
         }
 
         function closeSalaryModal() {
