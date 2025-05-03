@@ -524,12 +524,38 @@
             currentUser = name;
             const now = new Date();
             let initialDate = new Date();
-            if (now.getHours() < 6) initialDate.setDate(initialDate.getDate() - 1);
-            const formattedDate = initialDate.toISOString().split('T')[0];
-            document.getElementById('workDate').value = formattedDate;
+
+            // 仅当当前时间早于6点时调整为前一天
+            if (now.getHours() < 6) {
+                initialDate.setDate(initialDate.getDate() - 1);
+            }
+
+            // 格式化为YYYY-MM-DD
+            const year = initialDate.getFullYear();
+            const month = String(initialDate.getMonth() + 1).padStart(2, '0');
+            const day = String(initialDate.getDate()).padStart(2, '0');
+
+            document.getElementById('workDate').value = `${year}-${month}-${day}`;
             document.getElementById('startTime').value = '';
             document.getElementById('endTime').value = '';
             document.getElementById('timeModal').style.display = 'flex';
+        }
+
+        function calculateRecordDate(endTime) {
+            const [hours] = endTime.split(':').map(Number);
+            const recordDate = new Date();
+
+            // 仅当结束时间早于6点时调整为前一天
+            if (hours < 6) {
+                recordDate.setDate(recordDate.getDate() - 1);
+            }
+
+            // 格式化为YYYY-MM-DD
+            const year = recordDate.getFullYear();
+            const month = String(recordDate.getMonth() + 1).padStart(2, '0');
+            const day = String(recordDate.getDate()).padStart(2, '0');
+
+            return `${year}-${month}-${day}`;
         }
 
         function saveRecord() {
@@ -553,9 +579,9 @@
             }
 
             const hours = (diffMs / 3600000).toFixed(2);
-            const amount = hours * 50;
+            const amount = hours * 200;
 
-            records.push({ date: workDate, user: currentUser, start, end, hours, amount });
+            records.push({ date: calculateRecordDate(end), user: currentUser, start, end, hours, amount });
             localStorage.setItem('records', JSON.stringify(records));
 
             closeModal();
