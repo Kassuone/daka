@@ -558,11 +558,12 @@
             return `${year}-${month}-${day}`;
         }
 
+        // 修改保存记录函数
         function saveRecord() {
             const workDate = document.getElementById('workDate').value;
             const start = document.getElementById('startTime').value;
             const end = document.getElementById('endTime').value;
-
+            
             if (!workDate || !start || !end) {
                 showToast('请填写完整信息 ❗');
                 return;
@@ -570,29 +571,58 @@
 
             const startDateTime = new Date(`${workDate}T${start}`);
             let endDateTime = new Date(`${workDate}T${end}`);
+            
+            // 处理跨天情况
             if (end < start) endDateTime.setDate(endDateTime.getDate() + 1);
-
+            
             const diffMs = endDateTime - startDateTime;
             if (diffMs < 0) {
                 showToast('时间输入有误 ❗');
                 return;
             }
-
+            
             const hours = (diffMs / 3600000).toFixed(2);
             const amount = hours * 200;
 
-            records.push({ date: calculateRecordDate(end), user: currentUser, start, end, hours, amount });
-            localStorage.setItem('records', JSON.stringify(records));
-
-            closeModal();
-            renderHistory();
-            showToast('记录保存成功 ✔');
+            // 创建新数组保证引用更新
+            const newRecords = [...records, { 
+                date: workDate, 
+                user: currentUser, 
+                start, 
+                end, 
+                hours, 
+                amount 
+            }];
+            
+            // 保证存储和渲染的原子性操作
+            try {
+                localStorage.setItem('records', JSON.stringify(newRecords));
+                records = newRecords; // 同步内存数据
+                renderHistory();      // 立即渲染
+                showToast('记录保存成功 ✔');
+            } catch (error) {
+                console.error('存储失败:', error);
+                showToast('保存失败，请重试❗');
+            } finally {
+                closeModal();
+            }
         }
 
         // 历史记录
+        // 增强渲染函数
         function renderHistory() {
             const tbody = document.querySelector('#historyTable tbody');
-            tbody.innerHTML = records.map(record => `
+            if (!tbody) {
+                console.error('找不到历史记录容器');
+                return;
+            }
+            
+            // 根据日期降序排列
+            const sortedRecords = [...records].sort((a, b) => 
+                new Date(b.date) - new Date(a.date)
+            );
+
+            tbody.innerHTML = sortedRecords.map(record => `
                 <tr>
                     <td>${record.date}</td>
                     <td>${record.user}</td>
@@ -601,6 +631,11 @@
                     <td>¥${record.amount.toFixed(2)}</td>
                 </tr>
             `).join('');
+            
+            // 强制触发浏览器重绘
+            tbody.style.display = 'none';
+            tbody.offsetHeight; // 触发回流
+            tbody.style.display = '';
         }
 
         // 工资计算
